@@ -80,52 +80,6 @@ We designed CertifyAI as a robust, distributed system ready for scale.
 
 ---
 
-## 🚀 Getting Started (Full Application)
-
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
-
-### Prerequisites
-
-*   AWS Account & AWS CLI configured
-*   Docker & Docker Compose
-*   Node.js (v18+) & npm
-*   Python (v3.10+) & pip
-
-### Configuration
-
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/your-username/CertifyAI.git
-    cd CertifyAI
-    ```
-2.  **Set up Environment Variables:**
-    Create a `.env` file in the `backend` directory. This file will store all your secret keys.
-    ```env
-    # Database URLs
-    DATABASE_URL="postgresql://user:password@host:port/database"
-    MONGO_URI="mongodb://user:password@host:port/database"
-
-    # AWS Credentials
-    AWS_ACCESS_KEY_ID="YOUR_AWS_ACCESS_KEY"
-    AWS_SECRET_ACCESS_KEY="YOUR_AWS_SECRET_KEY"
-    AWS_REGION="your-aws-region"
-
-    # AI API Key
-    GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
-    ```
-
-### Running with Docker
-
-The easiest way to run the entire stack (backend, frontend, databases) is with Docker Compose.
-
-```bash
-# From the root directory
-docker-compose up --build
-```
-This will build the necessary images and start all the services defined in `docker-compose.yml`.
-
----
-
 ## 🌐 Running the Streamlit Prototype
 
 For a quick and reliable demo without setting up the full cloud stack, you can run our Streamlit prototype via Google Colab.
