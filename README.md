@@ -10,7 +10,7 @@
 
 For a stable and interactive demonstration of the core user journey, please visit our live prototype:
 
-**[🚀 View the Live Interactive Prototype 🚀]((https://certifyai-hackathon-demo-bqswk3z9r4xnyacpmcqr8f.streamlit.app/))**
+**[🚀 View the Live Interactive Prototype 🚀](https://certifyai-hackathon-demo-bqswk3z9r4xnyacpmcqr8f.streamlit.app/)**
 
 *(This prototype showcases the core user experience using Streamlit for a fast and reliable presentation.)*
 
@@ -131,7 +131,7 @@ This will build the necessary images and start all the services defined in `dock
 For a quick and reliable demo without setting up the full cloud stack, you can run our Streamlit prototype via Google Colab.
 
 1.  **Upload Code:** Ensure `app.py` and `requirements.txt` from the `/prototype` folder are in a public GitHub repo.
-2.  **Open Colab:** Launch a [Google Colab Notebook]((https://colab.research.google.com/drive/1-DnmLA7K8MBjtXV7P0gTH7jiavNLmPvG#scrollTo=pjswran3sjqs)).
+2.  **Open Colab:** Launch a [Google Colab Notebook](https://colab.research.google.com/drive/1-DnmLA7K8MBjtXV7P0gTH7jiavNLmPvG#scrollTo=pjswran3sjqs).
 3.  **Run the Setup Script:** Paste and run the setup code from our previous conversations to install libraries, clone the repo, and launch the app with `ngrok`.
 
 ---
