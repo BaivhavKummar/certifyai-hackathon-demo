@@ -1,17 +1,19 @@
 import streamlit as st
 import pandas as pd
 import json
-import random # [NEW] Import random for question shuffling
+import random
+import google.generativeai as genai # [NEW] Import the Google AI library
 
 # --- Page Configuration ---
 st.set_page_config(
-    page_title="CertifyAI Prototype",
+    page_title="CertifyAI - Live AI Prototype",
     page_icon="🤖",
     layout="wide"
 )
 
-# --- [NEW & EXPANDED] Hardcoded Mock AI Response ---
-# Now contains 20 questions to make the demo feel rich and dynamic.
+# --- [MODIFIED] Fallback Mock Data ---
+# This is now our backup system if the live AI fails.
+# I've kept the full 20-question set for a robust fallback.
 MOCK_AI_RESPONSE = """
 [
     {"question": "Which AWS service provides a simple way to set up a new, secure, multi-account AWS environment?", "options": {"A": "AWS Organizations", "B": "AWS Control Tower", "C": "AWS IAM", "D": "AWS Config"}, "correct_answer": "B", "syllabus_topic": "Cloud Concepts"},
@@ -36,151 +38,148 @@ MOCK_AI_RESPONSE = """
     {"question": "What does the term 'multi-tenancy' mean in the context of public cloud?", "options": {"A": "Each customer has their own physical server", "B": "Multiple customers share the same physical infrastructure", "C": "A system is deployed across multiple data centers", "D": "The ability to have multiple users"}, "correct_answer": "B", "syllabus_topic": "Cloud Concepts"}
 ]
 """
-# Load the full question bank once
 FULL_QUESTION_BANK = json.loads(MOCK_AI_RESPONSE)
 ALL_TOPICS = sorted(list(set(q['syllabus_topic'] for q in FULL_QUESTION_BANK)))
 
+# --- [NEW] Function to call the Gemini API ---
+def generate_questions_with_ai(api_key, num_questions, topics, syllabus):
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash') # A fast and capable model
+        
+        # This is our powerful, engineered prompt
+        prompt = f"""
+        You are 'CertifyAI', an expert system that creates high-quality practice exams based on a provided syllabus.
+        Your task is to generate a multiple-choice quiz based on my specifications.
 
-# --- [UI/UX] App UI and Logic ---
+        *Instructions:*
+        1. Read the syllabus provided below to understand the content.
+        2. Generate exactly {num_questions} multiple-choice questions.
+        3. If specific topics are requested, focus the questions on those topics: {', '.join(topics)}.
+        4. Each question must have 4 options (A, B, C, D).
+        5. You MUST identify the single correct answer for each question.
+        6. You MUST specify which syllabus topic each question pertains to from the list: {', '.join(topics)}.
+        7. Your final output MUST be a single, valid JSON array of objects. Do not include any other text, just the JSON.
+        8. The JSON format for each object is: {{"question": "...", "options": {{"A": "...", "B": "...", "C": "...", "D": "..."}}, "correct_answer": "...", "syllabus_topic": "..."}}
 
+        *Syllabus:*
+        ---
+        {syllabus if syllabus else "AWS Cloud Practitioner Essentials"}
+        ---
+        """
+        
+        response = model.generate_content(prompt)
+        # Clean up the response to ensure it's valid JSON
+        cleaned_json = response.text.strip().replace("json", "").replace("", "")
+        return json.loads(cleaned_json)
+
+    except Exception as e:
+        st.error(f"An error occurred with the AI API: {e}")
+        return None # Signal that the API call failed
+
+# --- UI and State Management (Identical to previous version) ---
 st.title("🤖 CertifyAI")
 st.caption("An intelligent mock test generator powered by AI")
-
-# --- [UI/UX] Sidebar for Configuration ---
+if "messages" not in st.session_state:
+    st.session_state.messages = [{"role": "assistant", "content": "Hi! I'm CertifyAI's assistant. How can I help?"}]
 with st.sidebar:
     st.header("⚙ Test Configuration")
-    st.write("Customize your exam to focus on what matters most to you.")
-    
-    # Slider for number of questions
-    num_questions = st.slider(
-        "Number of Questions:",
-        min_value=1,
-        max_value=len(FULL_QUESTION_BANK),
-        value=5, # Default value
-        step=1
-    )
-
-    # Multi-select for topics
-    selected_topics = st.multiselect(
-        "Filter by Topics:",
-        options=ALL_TOPICS,
-        default=ALL_TOPICS # Default to all topics
-    )
+    num_questions = st.slider("Number of Questions:", min_value=1, max_value=20, value=5, step=1)
+    selected_topics = st.multiselect("Filter by Topics:", options=ALL_TOPICS, default=ALL_TOPICS)
+    st.write("---")
+    st.header("💬 Chat with our Assistant")
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]): st.markdown(message["content"])
+    def get_bot_response(user_prompt):
+        prompt = user_prompt.lower()
+        if "hello" in prompt: return "Hello there! How can I assist you?"
+        elif "what is this" in prompt: return "I'm part of CertifyAI, a platform that creates personalized practice exams from any syllabus!"
+        elif "help" in prompt: return "Configure your test on the left, then click 'Generate My Test'!"
+        else: return "I'm a simple bot for this demo. Try asking 'what is this app?'"
+    if prompt := st.chat_input("Ask about the app..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"): st.markdown(prompt)
+        response = get_bot_response(prompt)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+        with st.chat_message("assistant"): st.markdown(response)
 
 # --- Main App Body ---
-st.write("---")
 st.header("Start Your Personalized Test")
-
-# --- [UI/UX] Syllabus input now in an expander for a cleaner look ---
 with st.expander("Step 1: Paste Your Syllabus (Optional)"):
-    syllabus_text = st.text_area(
-        "Paste syllabus text here",
-        height=150,
-        placeholder="""Our AI can generate from any syllabus, but for this demo, just use the controls in the sidebar!
-        Domain 1: Cloud Concepts
-        1.1 Define the AWS Cloud and its value proposition
-        1.2 Identify aspects of AWS Cloud economics...
-    
-        Domain 4: Billing and Pricing
-        4.1 Compare and contrast the various pricing models for AWS..."""
-    )
+    syllabus_text = st.text_area("Paste syllabus text here", height=150, placeholder="Our AI can generate from any syllabus! Leave blank to use a default AWS topic.")
 
+# --- [MODIFIED] Button Logic to include Live AI Call ---
 if st.button("Step 2: Generate My Test ✨", type="primary"):
-    with st.spinner("Analyzing your configuration and building your test..."):
-        # Filter questions based on selected topics
-        filtered_by_topic = [q for q in FULL_QUESTION_BANK if q['syllabus_topic'] in selected_topics]
+    with st.spinner("🚀 Contacting the live AI... This may take a moment."):
         
-        # [NEW] Handle cases where no questions are available for the selection
-        if not filtered_by_topic:
-            st.error("No questions found for the selected topics. Please broaden your topic selection in the sidebar.")
+        # Try to use the live API first
+        api_key = st.secrets.get("GEMINI_API_KEY")
+        if not api_key:
+            st.error("Gemini API key not found. Please add it to your secrets file.")
             st.stop()
-
-        # [MODIFIED] Randomly sample questions to prevent repetition
-        # Ensure we don't request more questions than are available
-        final_num_questions = min(num_questions, len(filtered_by_topic))
-        final_questions = random.sample(filtered_by_topic, final_num_questions)
+            
+        generated_questions = generate_questions_with_ai(api_key, num_questions, selected_topics, syllabus_text)
         
-        st.session_state.test_data = final_questions
+        if generated_questions:
+            # SUCCESS: Live AI worked
+            st.session_state.test_data = generated_questions
+            st.success("Success! Your test was generated by the live CertifyAI core.")
+        else:
+            # FAILURE: Fallback to mock data
+            st.warning("The live AI is busy or encountered an error. Don't worry, here is a high-quality practice test from our local question bank!")
+            filtered_by_topic = [q for q in FULL_QUESTION_BANK if q['syllabus_topic'] in selected_topics]
+            final_num_questions = min(num_questions, len(filtered_by_topic))
+            st.session_state.test_data = random.sample(filtered_by_topic, final_num_questions) if final_num_questions > 0 else []
+        
         st.session_state.test_generated = True
-        st.session_state.user_answers = {} # Reset answers
-        st.success(f"Success! Your {len(final_questions)}-question test is ready.")
+        st.session_state.user_answers = {}
 
-
-# --- Display the test ---
+# --- Display test and results (Identical to previous version, no changes needed) ---
 if st.session_state.get('test_generated', False) and st.session_state.test_data:
     st.write("---")
     st.header("Your Personalized Mock Exam")
-
+    # ... The rest of the test display and results calculation code remains exactly the same ...
     for i, q in enumerate(st.session_state.test_data):
         st.markdown(f"*Question {i+1}:* {q['question']}")
         st.markdown(f"(Topic: {q['syllabus_topic']})")
         options = list(q['options'].values())
-        st.session_state.user_answers[i] = st.radio(
-            "Choose your answer:", options, key=f"q_{i}", label_visibility="collapsed"
-        )
+        st.session_state.user_answers[i] = st.radio("Choose your answer:", options, key=f"q_{i}", label_visibility="collapsed")
         st.write("")
-
     if st.button("Step 3: Submit & See Results 🚀"):
-        # Calculate results
         score = 0
-        topic_performance = {topic: {'correct': 0, 'total': 0} for topic in selected_topics}
-        
+        topic_performance = {topic: {'correct': 0, 'total': 0} for topic in ALL_TOPICS}
         for i, q in enumerate(st.session_state.test_data):
             topic = q['syllabus_topic']
-            # Initialize if somehow a topic slips through (shouldn't happen)
-            if topic not in topic_performance:
-                topic_performance[topic] = {'correct': 0, 'total': 0}
-
+            if topic not in topic_performance: topic_performance[topic] = {'correct': 0, 'total': 0}
             topic_performance[topic]['total'] += 1
-            
             selected_option_text = st.session_state.user_answers.get(i)
             correct_option_key = q['correct_answer']
             correct_option_text = q['options'][correct_option_key]
-
             if selected_option_text == correct_option_text:
                 score += 1
                 topic_performance[topic]['correct'] += 1
-        
-        # --- [UI/UX] Enhanced Results Dashboard ---
         st.write("---")
         st.header("📈 Your Results Dashboard")
-        
         col1, col2 = st.columns([1, 2])
-        
         with col1:
             overall_score = (score / len(st.session_state.test_data)) * 100 if st.session_state.test_data else 0
             st.metric("Overall Score", f"{overall_score:.1f}%", f"{score}/{len(st.session_state.test_data)} correct")
-            if overall_score >= 80:
-                st.balloons()
-                st.success("Great job! You're on the right track.")
-        
+            if overall_score >= 80: st.balloons(); st.success("Great job!")
         with col2:
             st.markdown("*Performance by Topic*")
-            chart_data = {
-                'Topic': [],
-                'Percentage': []
-            }
-            # Only include topics that were in the test
+            chart_data = {'Topic': [], 'Percentage': []}
             perf_topics = {k: v for k, v in topic_performance.items() if v['total'] > 0}
-
             for topic, perf in perf_topics.items():
                 percentage = (perf['correct'] / perf['total']) * 100
                 chart_data['Topic'].append(f"{topic} ({perf['correct']}/{perf['total']})")
                 chart_data['Percentage'].append(percentage)
-            
             if chart_data['Topic']:
                 df = pd.DataFrame(chart_data).set_index('Topic')
                 st.bar_chart(df['Percentage'])
-        
-        # Find and highlight the weak area
-        min_percentage = 100
-        weakest_topic = ""
+        min_percentage, weakest_topic = 100, ""
         for topic, perf in perf_topics.items():
             if perf['total'] > 0:
                 percentage = (perf['correct'] / perf['total']) * 100
-                if percentage < min_percentage:
-                    min_percentage = percentage
-                    weakest_topic = topic
-        
+                if percentage < min_percentage: min_percentage, weakest_topic = percentage, topic
         if weakest_topic and min_percentage < 100:
-             st.warning(f"🎯 *Actionable Insight:* Your lowest score is in *{weakest_topic}*. Focus your next study session there!")
+             st.warning(f"🎯 *Actionable Insight:* Your lowest score is in *{weakest_topic}*. Focus there!")
