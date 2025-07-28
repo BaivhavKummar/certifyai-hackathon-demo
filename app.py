@@ -10,8 +10,8 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- Hardcoded Mock AI Response (for a reliable demo) ---
-# This JSON structure should match the one you designed in your prompt engineering.
+# --- Hardcoded Mock AI Response ---
+# No changes to this section
 MOCK_AI_RESPONSE = """
 [
   {
@@ -82,13 +82,17 @@ MOCK_AI_RESPONSE = """
   }
 ]
 """
+# Load the full question bank once
+FULL_QUESTION_BANK = json.loads(MOCK_AI_RESPONSE)
+ALL_TOPICS = sorted(list(set(q['syllabus_topic'] for q in FULL_QUESTION_BANK)))
+
 
 # --- App UI and Logic ---
 
 st.title("🤖 CertifyAI")
 st.subheader("Generate instant practice exams from any syllabus.")
 
-# Initialize session state for the test
+# Initialize session state
 if 'test_generated' not in st.session_state:
     st.session_state.test_generated = False
 if 'test_data' not in st.session_state:
@@ -97,44 +101,81 @@ if 'user_answers' not in st.session_state:
     st.session_state.user_answers = {}
 
 st.write("---")
-st.write("**Follow Sarah's Journey:**")
-st.info("Paste the AWS Cloud Practitioner syllabus text below, or just click 'Generate' to use a sample.")
+st.write("*Follow Sarah's Journey:*")
 
-# User Input
+# --- [NEW] Test Configuration Section ---
+with st.container(border=True):
+    st.subheader("1. Configure Your Test")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # Slider for number of questions
+        num_questions = st.slider(
+            "Number of Questions:",
+            min_value=1,
+            max_value=len(FULL_QUESTION_BANK),
+            value=4, # Default value
+            step=1
+        )
+
+    with col2:
+        # Multi-select for topics
+        selected_topics = st.multiselect(
+            "Filter by Topics (optional):",
+            options=ALL_TOPICS,
+            default=ALL_TOPICS # Default to all topics
+        )
+
+# User Input for syllabus
+st.subheader("2. Provide Syllabus")
 syllabus_text = st.text_area(
-    "1. Paste Syllabus Here",
+    "Paste Syllabus Here",
     height=150,
-    placeholder="""Domain 1: Cloud Concepts
-    1.1 Define the AWS Cloud and its value proposition
-    1.2 Identify aspects of AWS Cloud economics...
-    
-    Domain 4: Billing and Pricing
-    4.1 Compare and contrast the various pricing models for AWS..."""
+    placeholder="""Domain 1: Cloud Concepts..."""
 )
 
-if st.button("2. Generate My Test ✨", type="primary"):
+if st.button("3. Generate My Test ✨", type="primary"):
     with st.spinner("Analyzing syllabus and consulting the AI oracle... Please wait."):
-        time.sleep(5)  # Simulate AI thinking time
-        st.session_state.test_data = json.loads(MOCK_AI_RESPONSE)
-        st.session_state.test_generated = True
-        st.session_state.user_answers = {} # Reset answers for new test
-        st.success("Your personalized test is ready!")
+        time.sleep(2)
 
-# Display the test if it has been generated
-if st.session_state.test_generated:
+        # --- [MODIFIED] Logic to filter questions based on configuration ---
+        # First, filter by selected topics
+        filtered_questions = [
+            q for q in FULL_QUESTION_BANK if q['syllabus_topic'] in selected_topics
+        ]
+        
+        # Then, limit by the number of questions requested
+        # Ensure we don't request more questions than are available
+        final_num_questions = min(num_questions, len(filtered_questions))
+        final_questions = filtered_questions[:final_num_questions]
+        
+        st.session_state.test_data = final_questions
+        # --- End of modification ---
+
+        st.session_state.test_generated = True
+        st.session_state.user_answers = {} # Reset answers
+        
+        if not final_questions:
+             st.error("No questions found for the selected topics. Please broaden your topic selection.")
+        else:
+            st.success("Your personalized test is ready!")
+
+
+# --- Display the test (No changes to this section below) ---
+if st.session_state.test_generated and st.session_state.test_data:
     st.write("---")
     st.subheader("Your Personalized Mock Exam")
 
     for i, q in enumerate(st.session_state.test_data):
-        st.markdown(f"**Question {i+1}:** {q['question']}")
-        st.markdown(f"*(Topic: {q['syllabus_topic']})*")
+        st.markdown(f"*Question {i+1}:* {q['question']}")
+        st.markdown(f"(Topic: {q['syllabus_topic']})")
         options = list(q['options'].values())
         st.session_state.user_answers[i] = st.radio(
             "Choose your answer:", options, key=f"q_{i}"
         )
         st.write("")
 
-    if st.button("3. Submit & See Results 🚀"):
+    if st.button("4. Submit & See Results 🚀"):
         # Calculate results
         score = 0
         topic_performance = {}
@@ -142,9 +183,9 @@ if st.session_state.test_generated:
             topic = q['syllabus_topic']
             if topic not in topic_performance:
                 topic_performance[topic] = {'correct': 0, 'total': 0}
-            
+
             topic_performance[topic]['total'] += 1
-            
+
             selected_option_text = st.session_state.user_answers[i]
             correct_option_key = q['correct_answer']
             correct_option_text = q['options'][correct_option_key]
@@ -152,15 +193,15 @@ if st.session_state.test_generated:
             if selected_option_text == correct_option_text:
                 score += 1
                 topic_performance[topic]['correct'] += 1
-        
+
         # Display Results Dashboard
         st.write("---")
         st.subheader("📈 Your Results Dashboard")
 
-        overall_score = (score / len(st.session_state.test_data)) * 100
+        overall_score = (score / len(st.session_state.test_data)) * 100 if len(st.session_state.test_data) > 0 else 0
         st.metric("Overall Score", f"{overall_score:.1f}%", f"{score} out of {len(st.session_state.test_data)} correct")
-        
-        st.write("**This is the 'Aha!' Moment!**")
+
+        st.write("*This is the 'Aha!' Moment!*")
         st.markdown("Here's your performance breakdown by syllabus topic. Now you know exactly where to focus your studies.")
 
         # Prepare data for the bar chart
@@ -175,11 +216,14 @@ if st.session_state.test_generated:
             chart_data['Percentage'].append(percentage)
             chart_data['Performance'].append(f"{perf['correct']}/{perf['total']}")
 
-        df = pd.DataFrame(chart_data).set_index('Topic')
+        if chart_data['Topic']:
+            df = pd.DataFrame(chart_data).set_index('Topic')
+            st.markdown("### Performance by Topic")
+            st.bar_chart(df['Percentage'])
+            st.table(df)
 
-        # Highlight the weak area
-        st.markdown("### Performance by Topic")
-        st.bar_chart(df['Percentage'])
-        st.table(df)
-
-        st.warning("🎯 **Actionable Insight:** Your lowest score is in **Billing and Pricing**. Focus your next study session there!")
+            # Find and highlight the weak area
+            min_percentage = df['Percentage'].min()
+            weakest_topic = df['Percentage'].idxmin()
+            if min_percentage < 100:
+                 st.warning(f"🎯 *Actionable Insight:* Your lowest score is in *{weakest_topic}*. Focus your next study session there!")
