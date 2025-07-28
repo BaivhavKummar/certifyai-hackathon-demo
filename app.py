@@ -82,7 +82,7 @@ if "messages" not in st.session_state:
 if not st.session_state.app_started:
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
-        st.image("assets/logo.png", use_column_width=True)
+        st.image("assets/logo.jpg", use_column_width=True)
         st.title("Welcome to CertifyAI")
         st.subheader("The Future of Personalized Exam Preparation")
         st.write("")
@@ -102,7 +102,7 @@ else:
     
     # --- Complete Sidebar with All Features ---
     with st.sidebar:
-        st.image("assets/logo.png", width=100)
+        st.image("assets/logo.jpg", width=100)
         st.header("⚙ Test Configuration")
         st.write("Customize your exam.")
         num_questions = st.slider("Number of Questions:", min_value=1, max_value=20, value=5, step=1)
@@ -128,7 +128,7 @@ else:
             with st.chat_message("assistant"): st.markdown(response)
 
     # --- Main Page Content ---
-    st.image("assets/banner.png")
+    st.image("assets/banner.jpg")
     st.header("📝 Start Your Personalized Test")
 
     with st.expander("Step 1: Paste Your Syllabus (Optional)"):
