@@ -3,6 +3,7 @@ import pandas as pd
 import json
 import random
 import time
+from datetime import datetime
 import google.generativeai as genai
 
 # --- Page Configuration: Polished and Professional ---
@@ -68,58 +69,45 @@ def generate_questions_with_ai(api_key, num_questions, topics, syllabus):
         cleaned_json = response.text.strip().replace("json", "").replace("", "")
         return json.loads(cleaned_json)
     except Exception as e:
-        # This print statement is helpful for debugging in your local terminal
         print(f"Error during AI Generation: {e}")
         return None
 
 # --- Session State Initialization ---
-if "app_started" not in st.session_state:
-    st.session_state.app_started = False
-if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Hi! How can I help with the CertifyAI app today?"}]
+if "app_started" not in st.session_state: st.session_state.app_started = False
+if "messages" not in st.session_state: st.session_state.messages = [{"role": "assistant", "content": "Hi! How can I help with the CertifyAI app today?"}]
+if "test_history" not in st.session_state: st.session_state.test_history = []
 
-# --- Feature #4: Guided Welcome Page ---
+# --- Guided Welcome Page ---
 if not st.session_state.app_started:
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
-        st.image("assets/logo.jpg", use_column_width=True)
+        st.image("assets/logo.jpg", use_container_width=True)
         st.title("Welcome to CertifyAI")
         st.subheader("The Future of Personalized Exam Preparation")
         st.write("")
-        st.markdown(
-            """
-            CertifyAI is an intelligent platform that creates mock exams from any syllabus, helping you *study smarter, not harder.* 
-            
-            Ready to ace your next certification?
-            """
-        )
+        st.markdown("""CertifyAI is an intelligent platform that creates mock exams from any syllabus, helping you *study smarter, not harder.* Ready to ace your next certification?""")
         st.write("")
         if st.button("🚀 Start Building My Test", use_container_width=True, type="primary"):
             st.session_state.app_started = True
             st.rerun()
 else:
-    # --- Main Application UI Starts Here ---
-    
-    # --- Complete Sidebar with All Features ---
+    # --- Main Application UI ---
     with st.sidebar:
         st.image("assets/logo.jpg", width=100)
         st.header("⚙ Test Configuration")
-        st.write("Customize your exam.")
-        num_questions = st.slider("Number of Questions:", min_value=1, max_value=20, value=5, step=1)
-        selected_topics = st.multiselect("Filter by Topics:", options=ALL_TOPICS, default=ALL_TOPICS)
+        num_questions = st.slider("Number of Questions:", 1, 20, 5, 1)
+        selected_topics = st.multiselect("Filter by Topics:", ALL_TOPICS, ALL_TOPICS)
         st.write("---")
         st.header("💬 Chat with our Assistant")
         for message in st.session_state.messages:
             with st.chat_message(message["role"]): st.markdown(message["content"])
-        
         def get_bot_response(user_prompt):
             prompt = user_prompt.lower()
-            if "hello" in prompt or "hi" in prompt: return "Hello there! How can I assist you?"
-            elif "what is this" in prompt or "what do you do" in prompt: return "I'm part of CertifyAI, a platform that creates personalized practice exams from any syllabus!"
-            elif "how do i use" in prompt or "help" in prompt: return "Configure your test settings on the left, then click the 'Generate My Test' button on the main page. Good luck!"
+            if "hello" in prompt: return "Hello there! How can I assist you?"
+            elif "what is this" in prompt: return "I'm part of CertifyAI, a platform that creates personalized practice exams!"
+            elif "help" in prompt: return "Configure your test on the left, then click 'Generate My Test'!"
             elif "who built" in prompt or "team" in prompt: return "I was built by the talented team [Your Team Name] for the Comsoc HackX hackathon!"
-            else: return "I'm a simple bot for this demo. I can answer questions about what this app is and how to use it. Try asking 'what do you do?'"
-        
+            else: return "I'm a simple bot for this demo."
         if prompt := st.chat_input("Ask about the app..."):
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
@@ -127,7 +115,6 @@ else:
             st.session_state.messages.append({"role": "assistant", "content": response})
             with st.chat_message("assistant"): st.markdown(response)
 
-    # --- Main Page Content ---
     st.image("assets/banner.jpg")
     st.header("📝 Start Your Personalized Test")
 
@@ -135,31 +122,22 @@ else:
         syllabus_text = st.text_area("Paste syllabus text here", height=150, placeholder="Our AI can generate from any syllabus! Leave blank to use a default AWS topic.")
 
     if st.button("Step 2: Generate My Test ✨", type="primary", use_container_width=True):
-        final_questions = None
-        # --- Feature #1: Mission Control Status Panel ---
         with st.status("🚀 Launching CertifyAI Core...", state="running", expanded=True) as status:
+            final_questions = None
             try:
                 status.write("📡 Connecting to AI model...")
-                time.sleep(1) 
+                time.sleep(1)
                 api_key = st.secrets.get("GEMINI_API_KEY")
-                if not api_key:
-                    status.update(label="API Key not found! Switching to fallback.", state="error", expanded=False)
-                    time.sleep(1)
-                    raise ValueError("API Key missing.")
-
+                if not api_key: raise ValueError("API Key missing.")
                 status.write("🧠 Generating unique questions...")
-                time.sleep(1) 
+                time.sleep(1)
                 generated_questions = generate_questions_with_ai(api_key, num_questions, selected_topics, syllabus_text)
-                
                 status.write("✅ Parsing AI response...")
                 time.sleep(1)
-                
                 if generated_questions:
                     final_questions = generated_questions
                     status.update(label="Test built successfully by Live AI!", state="complete", expanded=False)
-                else:
-                    raise ValueError("AI failed to generate valid questions.")
-            
+                else: raise ValueError("AI failed to generate valid questions.")
             except Exception as e:
                 status.update(label="Live AI failed. Building test from local bank...", state="running")
                 time.sleep(1)
@@ -167,68 +145,82 @@ else:
                 final_num_questions = min(num_questions, len(filtered_by_topic))
                 final_questions = random.sample(filtered_by_topic, final_num_questions) if final_num_questions > 0 else []
                 status.update(label="Fallback test built successfully!", state="complete", expanded=False)
-        
         st.session_state.test_data = final_questions
         st.session_state.test_generated = True
         st.session_state.user_answers = {}
-        # Clear previous results when a new test is generated
-        if 'results' in st.session_state:
-            del st.session_state.results
+        if 'results' in st.session_state: del st.session_state.results
 
     if st.session_state.get('test_generated', False) and st.session_state.test_data:
-        st.write("---")
-        st.header("📝 Your Personalized Mock Exam")
+        st.header("✍ Your Personalized Mock Exam")
         for i, q in enumerate(st.session_state.test_data):
-            # --- Feature #2: Question "Cards" ---
             with st.container(border=True):
-                st.markdown(f"*Question {i+1} of {len(st.session_state.test_data)}* | Topic: {q.get('syllabus_topic', 'N/A')}")
+                st.markdown(f"*Question {i+1}* | Topic: {q.get('syllabus_topic', 'N/A')}")
                 st.markdown(f"##### {q['question']}")
                 options = list(q['options'].values())
                 st.session_state.user_answers[i] = st.radio("Options", options, key=f"q_{i}", label_visibility="collapsed")
         
         if st.button("Step 3: Submit & See Results 🚀", use_container_width=True):
             score, topic_performance = 0, {topic: {'correct': 0, 'total': 0} for topic in ALL_TOPICS}
+            feedback_items = []
             for i, q in enumerate(st.session_state.test_data):
                 topic = q.get('syllabus_topic', 'Unknown')
                 if topic not in topic_performance: topic_performance[topic] = {'correct': 0, 'total': 0}
                 topic_performance[topic]['total'] += 1
-                if st.session_state.user_answers.get(i) == q['options'].get(q['correct_answer']):
+                user_answer, correct_answer_key = st.session_state.user_answers.get(i), q['correct_answer']
+                correct_answer = q['options'].get(correct_answer_key)
+                is_correct = (user_answer == correct_answer)
+                if is_correct:
                     score += 1
                     topic_performance[topic]['correct'] += 1
-            st.session_state.results = {'score': score, 'topic_performance': topic_performance}
+                feedback_items.append({"question": q['question'],"user_answer": user_answer,"correct_answer": correct_answer,"is_correct": is_correct})
+            
+            overall_score_percent = (score / len(st.session_state.test_data)) * 100 if st.session_state.test_data else 0
+            st.session_state.results = {'score': score,'topic_performance': topic_performance,'feedback_items': feedback_items,'overall_score_percent': overall_score_percent}
+            st.session_state.test_history.append({"timestamp": datetime.now(),"score_percent": overall_score_percent})
             st.rerun()
 
     if st.session_state.get('results'):
-        results = st.session_state.results
-        score = results['score']
-        topic_performance = results['topic_performance']
-        
-        # --- Feature #3: Dynamic Results Dashboard ---
+        results, score, topic_performance = st.session_state.results, st.session_state.results['score'], st.session_state.results['topic_performance']
+        feedback_items, overall_score_percent = st.session_state.results['feedback_items'], st.session_state.results['overall_score_percent']
+
         st.write("---")
         st.header("📈 Your Results Dashboard")
-        
         col1, col2 = st.columns([1, 2])
-        
         with col1:
-            overall_score = (score / len(st.session_state.test_data)) * 100 if st.session_state.test_data else 0
-            st.metric("Overall Score", f"{overall_score:.1f}%", f"{score}/{len(st.session_state.test_data)} correct")
-            if overall_score >= 80:
+            st.metric("Overall Score", f"{overall_score_percent:.1f}%", f"{score}/{len(st.session_state.test_data)} correct")
+            if overall_score_percent >= 80:
                 st.balloons()
                 st.success("Excellent work! You are well-prepared.")
-        
         with col2:
             st.markdown("*Breakdown by Topic:*")
             perf_topics = {k: v for k, v in topic_performance.items() if v['total'] > 0}
-            
             for topic, perf in perf_topics.items():
                 percentage = (perf['correct'] / perf['total']) * 100
                 st.markdown(f"{topic}** ({perf['correct']}/{perf['total']})")
                 st.progress(int(percentage))
         
-        min_percentage, weakest_topic = 100, ""
+        weakest_topic, min_percentage = "", 100
         for topic, perf in perf_topics.items():
             if perf['total'] > 0 and (percentage := (perf['correct'] / perf['total']) * 100) < min_percentage:
                 min_percentage, weakest_topic = percentage, topic
-        
         if weakest_topic and min_percentage < 80:
-             st.warning(f"🎯 *Actionable Insight:* Your lowest score is in *{weakest_topic}*. Focus your next study session there!")
+             st.warning(f"🎯 *Actionable Insight:* Your lowest score is in *{weakest_topic}*. Focus there!")
+
+        st.write("---")
+        st.header("📖 Detailed Question Review")
+        for item in feedback_items:
+            with st.container(border=True):
+                st.markdown(f"##### {item['question']}")
+                if item['is_correct']:
+                    st.success(f"✅ Your answer: {item['user_answer']}", icon="✅")
+                else:
+                    st.error(f"❌ Your answer: {item['user_answer']}", icon="❌")
+                    st.info(f"💡 Correct answer: {item['correct_answer']}", icon="💡")
+        
+        if len(st.session_state.test_history) > 1:
+            st.write("---")
+            st.header("📊 Your Progress Over Time")
+            history_df = pd.DataFrame(st.session_state.test_history)
+            history_df.rename(columns={'timestamp': 'Test Taken', 'score_percent': 'Score (%)'}, inplace=True)
+            st.line_chart(history_df, x='Test Taken', y='Score (%)')
+            st.caption("This chart shows your performance across all tests in this session.")
