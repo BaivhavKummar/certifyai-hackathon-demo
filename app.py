@@ -82,7 +82,7 @@ with st.expander("Step 1: Paste Your Syllabus (Optional)"):
         1.2 Identify aspects of AWS Cloud economics...
     
         Domain 4: Billing and Pricing
-        4.1 Compare and contrast the various pricing models for AWS...""""""
+        4.1 Compare and contrast the various pricing models for AWS..."""
     )
 
 if st.button("Step 2: Generate My Test ✨", type="primary"):
